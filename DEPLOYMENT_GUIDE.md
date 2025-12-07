@@ -164,9 +164,9 @@ If you prefer Render instead of Railway:
 6. **Environment Variables**:
    ```
    NODE_ENV=production
-   PORT=10000
    ALLOWED_ORIGINS=https://your-frontend.vercel.app
    ```
+   **Note:** `PORT` is automatically set by Render - don't add it manually!
 
 7. **Deploy** and copy your Render URL
 
