@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sales-management-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: ALLOWED_ORIGINS
+        value: https://your-frontend.vercel.app
+    healthCheckPath: /api/health
+    plan: free
+

@@ -7,28 +7,48 @@ const app = express()
 const PORT = process.env.PORT || 5001
 
 // CORS configuration - allow requests from frontend
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : []
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true)
     
-    // Allow localhost on any port
+    // Allow localhost on any port (for development)
     if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
       return callback(null, true)
     }
     
-    // Allow specific origins (including port 3001 if 3000 is in use)
-    const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001']
-    if (allowedOrigins.includes(origin)) {
+    // Allow specific localhost origins
+    const localOrigins = ['http://localhost:3000', 'http://localhost:3001']
+    if (localOrigins.includes(origin)) {
       return callback(null, true)
     }
     
-    // Also allow any localhost port for development
+    // Allow any localhost port for development
     if (origin.match(/^http:\/\/localhost:\d+$/)) {
       return callback(null, true)
     }
     
-    callback(new Error('Not allowed by CORS'))
+    // Allow production origins from environment variable
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+    
+    // Allow Vercel preview and production URLs
+    if (origin.includes('.vercel.app') || origin.includes('vercel.app')) {
+      return callback(null, true)
+    }
+    
+    // In production, be more strict
+    if (process.env.NODE_ENV === 'production' && allowedOrigins.length > 0) {
+      callback(new Error(`Origin ${origin} not allowed by CORS`))
+    } else {
+      // In development or if no specific origins set, allow all
+      callback(null, true)
+    }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
