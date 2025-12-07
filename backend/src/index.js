@@ -80,12 +80,24 @@ const salesService = new SalesService()
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
-  const isDataLoaded = salesService.getSalesData() !== null
-  res.json({ 
-    status: "ok", 
-    message: "Sales Management System Backend",
-    dataLoaded: isDataLoaded
-  })
+  try {
+    const salesData = salesService.getSalesData()
+    const isDataLoaded = salesData !== null && salesData.length > 0
+    res.json({ 
+      status: "ok", 
+      message: "Sales Management System Backend",
+      dataLoaded: isDataLoaded,
+      recordCount: isDataLoaded ? salesData.length : 0
+    })
+  } catch (error) {
+    console.error("Health check error:", error)
+    res.status(500).json({
+      status: "error",
+      message: "Backend error",
+      dataLoaded: false,
+      error: error.message
+    })
+  }
 })
 
 const server = app.listen(PORT, () => {

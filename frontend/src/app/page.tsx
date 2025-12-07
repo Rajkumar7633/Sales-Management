@@ -26,62 +26,85 @@ export default function Dashboard() {
   // Check backend status and fetch filter options on mount
   useEffect(() => {
     const checkBackendAndFetch = async () => {
-      const fetchOptions = async () => {
-        try {
-          console.log("Fetching filter options from:", API_ENDPOINTS.filterOptions)
-          const res = await fetch(API_ENDPOINTS.filterOptions, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            mode: "cors",
-            credentials: "omit",
-          })
+    const fetchOptions = async () => {
+      try {
+        console.log("Fetching filter options from:", API_ENDPOINTS.filterOptions)
+        const res = await fetch(API_ENDPOINTS.filterOptions, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          mode: "cors",
+          credentials: "omit",
+        })
 
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`)
-          }
-
-          const data = await res.json()
-          setFilterOptions(data)
-        } catch (error) {
-          console.error("Error fetching filter options:", error)
-          console.error("API URL:", API_ENDPOINTS.filterOptions)
-          // Set empty options on error
-          setFilterOptions({
-            regions: [],
-            genders: [],
-            ageRanges: ["18-25", "26-35", "36-45", "46-55", "56+"],
-            categories: [],
-            tags: [],
-            paymentMethods: [],
-          })
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`)
         }
+
+        const data = await res.json()
+        setFilterOptions(data)
+      } catch (error) {
+        console.error("Error fetching filter options:", error)
+        console.error("API URL:", API_ENDPOINTS.filterOptions)
+        // Set empty options on error
+        setFilterOptions({
+          regions: [],
+          genders: [],
+          ageRanges: ["18-25", "26-35", "36-45", "46-55", "56+"],
+          categories: [],
+          tags: [],
+          paymentMethods: [],
+        })
       }
+    }
       
       try {
         // First check if backend data is loaded
+        console.log("Checking backend health at:", API_ENDPOINTS.health)
         const healthRes = await fetch(API_ENDPOINTS.health, {
           method: "GET",
           mode: "cors",
+          signal: AbortSignal.timeout(10000), // 10 second timeout
         })
         
         if (healthRes.ok) {
           const health = await healthRes.json()
+          console.log("Backend health:", health)
           if (!health.dataLoaded) {
             console.log("Backend data is still loading, will retry in 2 seconds...")
             // Retry after 2 seconds if data not loaded
-            setTimeout(() => fetchOptions(), 2000)
+            setTimeout(() => checkBackendAndFetch(), 2000)
             return
           }
+        } else {
+          console.error("Backend health check failed:", healthRes.status, healthRes.statusText)
         }
         
         // Fetch filter options
         await fetchOptions()
-      } catch (error) {
+        setBackendLoading(false)
+      } catch (error: any) {
         console.error("Error checking backend:", error)
-        // Still try to fetch options
-        fetchOptions()
+        console.error("API Base URL:", API_BASE_URL)
+        console.error("This might mean:")
+        console.error("1. Backend is not running")
+        console.error("2. NEXT_PUBLIC_API_URL is not set in Vercel")
+        console.error("3. CORS is blocking the request")
+        
+        // Show error to user
+        if (error.name === 'AbortError' || error.message?.includes('fetch')) {
+          setBackendLoading(false)
+          // Still try to fetch options, but it will likely fail
+          try {
+            await fetchOptions()
+          } catch (e) {
+            console.error("Failed to fetch options:", e)
+          }
+        } else {
+          // Retry after 3 seconds
+          setTimeout(() => checkBackendAndFetch(), 3000)
+        }
       }
     }
     
