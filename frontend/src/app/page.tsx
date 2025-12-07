@@ -14,14 +14,18 @@ export default function Dashboard() {
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, totalItems: 0, totalPages: 0 })
   const [metadata, setMetadata] = useState({ totalUnits: 0, totalAmount: 0, totalDiscount: 0 })
   const [loading, setLoading] = useState(true)
+  const [backendLoading, setBackendLoading] = useState(true)
   const [filterOptions, setFilterOptions] = useState<any>(null)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   const store = useSalesStore()
 
-  // Fetch data whenever store changes
+  // Fetch data whenever store changes (but wait for backend to be ready)
   useEffect(() => {
-    fetchData()
-  }, [store.search, store.page, store.sortBy, store.sortOrder, store.filters])
+    if (!backendLoading && !connectionError) {
+      fetchData()
+    }
+  }, [store.search, store.page, store.sortBy, store.sortOrder, store.filters, backendLoading, connectionError])
 
   // Check backend status and fetch filter options on mount
   useEffect(() => {
@@ -59,6 +63,18 @@ export default function Dashboard() {
       }
     }
       
+      // Check if API URL is configured (not localhost in production)
+      if (typeof window !== 'undefined' && API_BASE_URL.includes('localhost')) {
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+        if (isProduction) {
+          setConnectionError("⚠️ Backend API URL not configured! Please set NEXT_PUBLIC_API_URL in Vercel environment variables.")
+          setBackendLoading(false)
+          console.error("❌ API URL is localhost in production!")
+          console.error("Please set NEXT_PUBLIC_API_URL in Vercel to: https://sales-management-backend-fndm.onrender.com")
+          return
+        }
+      }
+
       try {
         // First check if backend data is loaded
         console.log("Checking backend health at:", API_ENDPOINTS.health)
@@ -73,37 +89,41 @@ export default function Dashboard() {
           console.log("Backend health:", health)
           if (!health.dataLoaded) {
             console.log("Backend data is still loading, will retry in 2 seconds...")
+            setConnectionError("Backend is loading data, please wait...")
             // Retry after 2 seconds if data not loaded
             setTimeout(() => checkBackendAndFetch(), 2000)
             return
           }
+          setConnectionError(null) // Clear any previous errors
         } else {
           console.error("Backend health check failed:", healthRes.status, healthRes.statusText)
+          setConnectionError(`Backend returned error: ${healthRes.status}`)
         }
         
         // Fetch filter options
         await fetchOptions()
         setBackendLoading(false)
+        setConnectionError(null)
       } catch (error: any) {
         console.error("Error checking backend:", error)
         console.error("API Base URL:", API_BASE_URL)
-        console.error("This might mean:")
-        console.error("1. Backend is not running")
-        console.error("2. NEXT_PUBLIC_API_URL is not set in Vercel")
-        console.error("3. CORS is blocking the request")
         
-        // Show error to user
-        if (error.name === 'AbortError' || error.message?.includes('fetch')) {
-          setBackendLoading(false)
-          // Still try to fetch options, but it will likely fail
-          try {
-            await fetchOptions()
-          } catch (e) {
-            console.error("Failed to fetch options:", e)
-          }
+        // Set user-friendly error message
+        if (error.name === 'AbortError') {
+          setConnectionError("Connection timeout. Backend may be slow to respond.")
+        } else if (error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
+          setConnectionError("Cannot connect to backend. Check if backend is running and CORS is configured.")
         } else {
-          // Retry after 3 seconds
-          setTimeout(() => checkBackendAndFetch(), 3000)
+          setConnectionError(`Connection error: ${error.message || 'Unknown error'}`)
+        }
+        
+        setBackendLoading(false)
+        
+        // Still try to fetch options, but it will likely fail
+        try {
+          await fetchOptions()
+        } catch (e) {
+          console.error("Failed to fetch options:", e)
         }
       }
     }
@@ -398,12 +418,32 @@ export default function Dashboard() {
         {/* Main Content */}
         <main className="flex-1 overflow-auto px-8 py-6">
           <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            {loading ? (
+            {connectionError ? (
+              <div className="p-12 text-center">
+                <div className="inline-block mb-4">
+                  <div className="w-12 h-12 border-4 border-red-200 border-t-red-600 rounded-full" />
+                </div>
+                <p className="text-lg font-medium text-red-900 mb-2">Connection Error</p>
+                <p className="text-sm text-red-700 mb-4">{connectionError}</p>
+                {API_BASE_URL.includes('localhost') && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-left max-w-2xl mx-auto">
+                    <p className="text-sm font-semibold text-yellow-900 mb-2">🔧 Quick Fix:</p>
+                    <ol className="text-sm text-yellow-800 list-decimal list-inside space-y-1">
+                      <li>Go to Vercel Dashboard → Your Project → Settings → Environment Variables</li>
+                      <li>Add: <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_API_URL</code> = <code className="bg-yellow-100 px-1 rounded">https://sales-management-backend-fndm.onrender.com</code></li>
+                      <li>Redeploy your Vercel app</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+            ) : loading || backendLoading ? (
               <div className="p-12 text-center">
                 <div className="inline-block animate-spin mb-4">
                   <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full" />
                 </div>
-                <p className="text-lg font-medium text-slate-900 mb-2">Loading transactions...</p>
+                <p className="text-lg font-medium text-slate-900 mb-2">
+                  {backendLoading ? "Connecting to backend..." : "Loading transactions..."}
+                </p>
                 {pagination.totalItems > 0 ? (
                   <>
                     <p className="text-sm text-slate-500">Processing {pagination.totalItems.toLocaleString()} records</p>
