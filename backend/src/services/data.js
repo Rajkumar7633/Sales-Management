@@ -1,108 +1,131 @@
-import { parse } from "csv-parse/sync"
-import { readFileSync, existsSync } from "fs"
+import { parse } from "csv-parse"
+import { createReadStream, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { dirname, join } from "path"
+import { pipeline } from "stream/promises"
+import { Transform } from "stream"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 let cachedData = null
+let isLoading = false
+let loadingPromise = null
 
-// Memory-efficient CSV loading for Render free tier (512MB limit)
-export function generateSalesData() {
+// Memory-efficient streaming CSV loading for Render free tier (512MB limit)
+export async function generateSalesData() {
   // Return cached data if available
   if (cachedData) {
     return cachedData
   }
 
-  try {
-    const csvPath = join(__dirname, "..", "..", "..", "truestate_assignment_dataset.csv")
-    
-    if (!existsSync(csvPath)) {
-      console.error(`CSV file not found at: ${csvPath}`)
-      throw new Error(`CSV file not found at ${csvPath}`)
-    }
-    
-    console.log(`Loading CSV from: ${csvPath}`)
-    console.log(`⚠️  Using memory-efficient loading for Render free tier...`)
-    const loadStartTime = Date.now()
-    
-    // Use sync parsing but process in smaller chunks to reduce memory spikes
-    console.log("Reading CSV file...")
-    const fileContent = readFileSync(csvPath, "utf-8")
-    const readTime = ((Date.now() - loadStartTime) / 1000).toFixed(2)
-    console.log(`CSV file read in ${readTime}s, parsing...`)
-
-    // Parse CSV with optimized settings
-    const records = parse(fileContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true,
-      bom: true,
-      cast: false,
-    })
-
-    console.log(`Parsing ${records.length} records...`)
-    const transformStartTime = Date.now()
-    
-    // Transform in batches to reduce memory pressure
-    const batchSize = 10000
-    const transformedData = []
-    
-    for (let i = 0; i < records.length; i += batchSize) {
-      const batch = records.slice(i, i + batchSize)
-      const transformedBatch = batch.map((record) => ({
-        "Transaction ID": record["Transaction ID"],
-        Date: record["Date"],
-        "Customer ID": record["Customer ID"],
-        "Customer name": record["Customer Name"] || "",
-        "Phone Number": record["Phone Number"] || "",
-        Gender: record["Gender"] || "",
-        Age: parseInt(record["Age"], 10) || 0,
-        "Customer region": record["Customer Region"] || "",
-        "Product ID": record["Product ID"] || "",
-        "Product Category": record["Product Category"] || "",
-        Quantity: parseInt(record["Quantity"], 10) || 0,
-        "Price per Unit": parseFloat(record["Price per Unit"]) || 0,
-        "Total Amount": parseFloat(record["Total Amount"]) || 0,
-        "Final Amount": parseFloat(record["Final Amount"]) || 0,
-        "Payment Method": record["Payment Method"] || "",
-        Tags: record["Tags"] || "",
-        "Employee name": record["Employee Name"] || "",
-        "Customer Type": record["Customer Type"] || "",
-        "Product Name": record["Product Name"] || "",
-        Brand: record["Brand"] || "",
-        "Discount Percentage": parseFloat(record["Discount Percentage"]) || 0,
-        "Order Status": record["Order Status"] || "",
-        "Delivery Type": record["Delivery Type"] || "",
-        "Store ID": record["Store ID"] || "",
-        "Store Location": record["Store Location"] || "",
-        "Salesperson ID": record["Salesperson ID"] || "",
-      }))
-      transformedData.push(...transformedBatch)
-      
-      // Force garbage collection hint between batches
-      if (global.gc && i % (batchSize * 5) === 0) {
-        global.gc()
-      }
-    }
-    
-    const transformTime = ((Date.now() - transformStartTime) / 1000).toFixed(2)
-    console.log(`Data transformation completed in ${transformTime}s`)
-
-    // Cache the data
-    cachedData = transformedData
-    const totalTime = ((Date.now() - loadStartTime) / 1000).toFixed(2)
-    console.log(`✅ Loaded ${transformedData.length} records from CSV in ${totalTime}s`)
-    return transformedData
-  } catch (error) {
-    console.error("Error reading CSV file:", error)
-    if (error.message && error.message.includes("heap")) {
-      console.error("❌ Out of memory! Consider upgrading Render plan or optimizing data loading.")
-    }
-    return []
+  // If already loading, return the promise
+  if (isLoading && loadingPromise) {
+    return loadingPromise
   }
+
+  isLoading = true
+  loadingPromise = (async () => {
+    try {
+      const csvPath = join(__dirname, "..", "..", "..", "truestate_assignment_dataset.csv")
+      
+      if (!existsSync(csvPath)) {
+        console.error(`CSV file not found at: ${csvPath}`)
+        throw new Error(`CSV file not found at ${csvPath}`)
+      }
+      
+      console.log(`Loading CSV from: ${csvPath}`)
+      console.log(`⚠️  Using streaming CSV parsing for memory efficiency...`)
+      const loadStartTime = Date.now()
+      
+      const records = []
+      let recordCount = 0
+      let headerSkipped = false
+
+      // Transform stream to process CSV records one by one
+      const transformer = new Transform({
+        objectMode: true,
+        transform(chunk, encoding, callback) {
+          // Skip header row
+          if (!headerSkipped) {
+            headerSkipped = true
+            return callback()
+          }
+
+          // Transform CSV record to match expected format
+          const transformedRecord = {
+            "Transaction ID": chunk["Transaction ID"] || "",
+            Date: chunk["Date"] || "",
+            "Customer ID": chunk["Customer ID"] || "",
+            "Customer name": chunk["Customer Name"] || "",
+            "Phone Number": chunk["Phone Number"] || "",
+            Gender: chunk["Gender"] || "",
+            Age: parseInt(chunk["Age"], 10) || 0,
+            "Customer region": chunk["Customer Region"] || "",
+            "Product ID": chunk["Product ID"] || "",
+            "Product Category": chunk["Product Category"] || "",
+            Quantity: parseInt(chunk["Quantity"], 10) || 0,
+            "Price per Unit": parseFloat(chunk["Price per Unit"]) || 0,
+            "Total Amount": parseFloat(chunk["Total Amount"]) || 0,
+            "Final Amount": parseFloat(chunk["Final Amount"]) || 0,
+            "Payment Method": chunk["Payment Method"] || "",
+            Tags: chunk["Tags"] || "",
+            "Employee name": chunk["Employee Name"] || "",
+            "Customer Type": chunk["Customer Type"] || "",
+            "Product Name": chunk["Product Name"] || "",
+            Brand: chunk["Brand"] || "",
+            "Discount Percentage": parseFloat(chunk["Discount Percentage"]) || 0,
+            "Order Status": chunk["Order Status"] || "",
+            "Delivery Type": chunk["Delivery Type"] || "",
+            "Store ID": chunk["Store ID"] || "",
+            "Store Location": chunk["Store Location"] || "",
+            "Salesperson ID": chunk["Salesperson ID"] || "",
+          }
+          
+          records.push(transformedRecord)
+          recordCount++
+          
+          // Log progress every 100k records
+          if (recordCount % 100000 === 0) {
+            console.log(`  Processed ${recordCount.toLocaleString()} records...`)
+          }
+          
+          callback()
+        },
+      })
+
+      // Stream CSV file through parser and transformer
+      await pipeline(
+        createReadStream(csvPath),
+        parse({
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          relax_column_count: true,
+          bom: true,
+          cast: false, // Don't auto-cast to reduce memory
+        }),
+        transformer
+      )
+
+      cachedData = records
+      const totalTime = ((Date.now() - loadStartTime) / 1000).toFixed(2)
+      console.log(`✅ Loaded ${cachedData.length.toLocaleString()} records from CSV in ${totalTime}s`)
+      return cachedData
+    } catch (error) {
+      console.error("Error reading CSV file:", error)
+      if (error.message && error.message.includes("heap")) {
+        console.error("❌ Out of memory! The CSV file is too large for the current memory limit.")
+      }
+      cachedData = []
+      return []
+    } finally {
+      isLoading = false
+      loadingPromise = null
+    }
+  })()
+
+  return loadingPromise
 }
 
 export function getFilterOptions(data) {

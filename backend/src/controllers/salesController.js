@@ -52,9 +52,9 @@ export class SalesController {
     }
   }
 
-  getFilterOptions(req, res) {
+  async getFilterOptions(req, res) {
     try {
-      const options = this.salesService.getFilterOptions()
+      const options = await this.salesService.getFilterOptions()
       res.json(options)
     } catch (error) {
       console.error("Filter Options Error:", error)

@@ -6,11 +6,11 @@ export class SalesService {
     this.salesData = null
   }
 
-  getSalesData() {
+  async getSalesData() {
     if (!this.salesData) {
       console.log("Initializing sales data from CSV...")
       const startTime = Date.now()
-      this.salesData = generateSalesData()
+      this.salesData = await generateSalesData()
       const loadTime = ((Date.now() - startTime) / 1000).toFixed(2)
       console.log(`✅ Sales data initialized: ${this.salesData.length} records in ${loadTime}s`)
     }
@@ -18,20 +18,19 @@ export class SalesService {
   }
   
   async preloadData() {
-    return new Promise((resolve, reject) => {
-      try {
-        if (!this.salesData) {
-          console.log("Pre-loading CSV data on server startup...")
-          const startTime = Date.now()
-          this.salesData = generateSalesData()
-          const loadTime = ((Date.now() - startTime) / 1000).toFixed(2)
-          console.log(`✅ Pre-loaded ${this.salesData.length} records in ${loadTime}s`)
-        }
-        resolve(this.salesData)
-      } catch (error) {
-        reject(error)
+    try {
+      if (!this.salesData) {
+        console.log("Pre-loading CSV data on server startup...")
+        const startTime = Date.now()
+        this.salesData = await generateSalesData()
+        const loadTime = ((Date.now() - startTime) / 1000).toFixed(2)
+        console.log(`✅ Pre-loaded ${this.salesData.length} records in ${loadTime}s`)
       }
-    })
+      return this.salesData
+    } catch (error) {
+      console.error("Error pre-loading data:", error)
+      throw error
+    }
   }
 
   async getFilteredSales({
@@ -47,7 +46,7 @@ export class SalesService {
     paymentMethods,
     dateRange,
   }) {
-    const salesData = this.getSalesData()
+    const salesData = await this.getSalesData()
 
     // Set default sort order based on sortBy
     const defaultSortOrder = sortOrder || (sortBy === "customerName" ? "asc" : "desc")
@@ -100,8 +99,8 @@ export class SalesService {
     }
   }
 
-  getFilterOptions() {
-    const salesData = this.getSalesData()
+  async getFilterOptions() {
+    const salesData = await this.getSalesData()
     return getFilterOptionsFromData(salesData)
   }
 }

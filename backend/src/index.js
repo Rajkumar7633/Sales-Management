@@ -79,9 +79,9 @@ const salesService = new SalesService()
 // Data will load lazily on first API request
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
   try {
-    const salesData = salesService.getSalesData()
+    const salesData = await salesService.getSalesData()
     const isDataLoaded = salesData !== null && salesData.length > 0
     res.json({ 
       status: "ok", 
