@@ -32,21 +32,30 @@ app.use(cors({
       return callback(null, true)
     }
     
+    // Allow Vercel preview and production URLs (check this FIRST)
+    if (origin.includes('.vercel.app') || origin.includes('vercel.app')) {
+      console.log(`✅ Allowing CORS for Vercel origin: ${origin}`)
+      return callback(null, true)
+    }
+    
     // Allow production origins from environment variable
     if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      console.log(`✅ Allowing CORS for configured origin: ${origin}`)
       return callback(null, true)
     }
     
-    // Allow Vercel preview and production URLs
-    if (origin.includes('.vercel.app') || origin.includes('vercel.app')) {
+    // In production, if no specific origins set, allow all (for now)
+    if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+      console.log(`⚠️  Allowing CORS for origin (no restrictions): ${origin}`)
       return callback(null, true)
     }
     
-    // In production, be more strict
+    // Reject if in production with restrictions and origin not allowed
     if (process.env.NODE_ENV === 'production' && allowedOrigins.length > 0) {
+      console.log(`❌ Rejecting CORS for origin: ${origin}`)
       callback(new Error(`Origin ${origin} not allowed by CORS`))
     } else {
-      // In development or if no specific origins set, allow all
+      // In development, allow all
       callback(null, true)
     }
   },
