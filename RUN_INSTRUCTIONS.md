@@ -7,17 +7,19 @@ The frontend includes Next.js API routes, so you can run just the frontend and i
 ### Steps:
 
 1. **Install dependencies** (if not already done):
+
 ```bash
 npm install
 ```
 
 2. **Start the development server**:
+
 ```bash
 npm run dev
 ```
 
 3. **Open your browser**:
-Navigate to `http://localhost:3000`
+   Navigate to `http://localhost:3000`
 
 The frontend will automatically load data from the CSV file and handle all API requests through Next.js API routes.
 
@@ -30,37 +32,43 @@ If you want to use the standalone Express backend server:
 ### Terminal 1 - Start Backend Server:
 
 1. **Navigate to server directory**:
+
 ```bash
 cd server
 ```
 
 2. **Install dependencies** (if not already done):
+
 ```bash
 npm install
 ```
 
 3. **Start the backend server**:
+
 ```bash
 npm run dev
 ```
 
 You should see:
+
 ```
 Loading sales data from CSV...
 Loaded 1000000 records from CSV
-Sales Management System Backend running on http://localhost:5000
+Sales Management System Backend running on http://localhost:5001
 ```
 
-The backend runs on **http://localhost:5000**
+The backend runs on **http://localhost:5001**
 
 ### Terminal 2 - Start Frontend:
 
 1. **Go back to root directory** (if you're in server folder):
+
 ```bash
 cd ..
 ```
 
 2. **Start the frontend**:
+
 ```bash
 npm run dev
 ```
@@ -72,6 +80,7 @@ The frontend runs on **http://localhost:3000**
 ## Quick Start Commands Summary
 
 ### Frontend Only (Easiest):
+
 ```bash
 # In root directory
 npm install
@@ -80,16 +89,50 @@ npm run dev
 ```
 
 ### Both Frontend and Backend:
+
 ```bash
 # Terminal 1 - Backend
 cd server
 npm install
 npm run dev
 
-# Terminal 2 - Frontend  
+# Terminal 2 - Frontend
 cd ..  # (if you're in server folder)
 npm install
 npm run dev
+```
+
+---
+
+## Push to GitHub Automatically
+
+### One-Command Automated Push:
+
+```bash
+# First time - make script executable
+chmod +x push-to-github.sh
+
+# Then run automated push
+./push-to-github.sh
+```
+
+The script will:
+
+- ✅ Initialize Git (if needed)
+- ✅ Stage all files
+- ✅ Create a commit with timestamp
+- ✅ Set branch to main
+- ✅ Add GitHub remote
+- ✅ Push everything to GitHub
+
+Your code will be live at: `https://github.com/Rajkumar7633/Sales-Management`
+
+### Manual Push (Alternative):
+
+```bash
+git add .
+git commit -m "Deploy Sales Management System"
+git push -u origin main
 ```
 
 ---
@@ -103,6 +146,7 @@ npm run dev
 3. **First Load**: The first time you start the server, it will take some time to load the CSV file into memory. Subsequent requests will be fast.
 
 4. **Ports**:
+
    - Frontend: `http://localhost:3000`
    - Backend: `http://localhost:5000`
 
@@ -115,6 +159,7 @@ npm run dev
 ## Troubleshooting
 
 ### If you get "Cannot find module" errors:
+
 ```bash
 # Reinstall dependencies
 npm install
@@ -123,7 +168,9 @@ npm install
 ```
 
 ### If you get "Out of memory" errors:
+
 The scripts already include increased memory limits. If you still have issues, you can increase it further:
+
 ```bash
 # For frontend
 NODE_OPTIONS='--max-old-space-size=8192' npm run dev
@@ -134,7 +181,9 @@ NODE_OPTIONS='--max-old-space-size=8192' npm run dev
 ```
 
 ### If CSV file is not found:
+
 Make sure `truestate_assignment_dataset.csv` is in the root directory:
+
 ```bash
 ls truestate_assignment_dataset.csv
 ```
@@ -144,14 +193,15 @@ ls truestate_assignment_dataset.csv
 ## Production Build
 
 ### Frontend:
+
 ```bash
 npm run build
 npm start
 ```
 
 ### Backend:
+
 ```bash
 cd server
 npm start
 ```
-
