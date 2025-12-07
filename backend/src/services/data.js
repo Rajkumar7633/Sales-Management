@@ -15,11 +15,6 @@ export function generateSalesData() {
     return cachedData
   }
 
-  // If already loading, return the promise
-  if (isLoading && loadingPromise) {
-    return []
-  }
-
   try {
     const csvPath = join(__dirname, "..", "..", "..", "truestate_assignment_dataset.csv")
     
