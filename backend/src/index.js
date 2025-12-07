@@ -68,22 +68,15 @@ app.use(express.json())
 // Routes
 app.use("/api/sales", salesRoutes)
 
-// Pre-load CSV data on server startup to avoid first request delay
+// Don't pre-load CSV on startup for Render free tier (512MB limit)
+// Load data on first request instead to avoid memory issues
 console.log("Sales Management System Backend starting...")
-console.log("Pre-loading CSV data in background (this may take 30-60 seconds)...")
+console.log("⚠️  CSV data will load on first request (to save memory on Render free tier)")
 
 const salesService = new SalesService()
 
-// Pre-load data in background (non-blocking) so server starts immediately
-setImmediate(async () => {
-  try {
-    await salesService.preloadData()
-    console.log("✅ CSV data pre-loaded successfully - server ready for requests!")
-  } catch (error) {
-    console.error("❌ Error pre-loading CSV data:", error.message)
-    console.error("Data will load on first request (may cause delay)")
-  }
-})
+// Note: We're NOT pre-loading data to avoid memory issues on Render free tier
+// Data will load lazily on first API request
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
