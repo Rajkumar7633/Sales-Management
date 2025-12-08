@@ -1,6 +1,6 @@
 // API Configuration
 // Change this to point to your backend server
-export const API_BASE_URL =
+export const API_BASE_URL = 
   (typeof window !== 'undefined' && (window as any).__API_BASE_URL__) ||
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
   "http://localhost:5001"
