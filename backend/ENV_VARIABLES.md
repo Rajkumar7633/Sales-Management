@@ -38,6 +38,8 @@ When deploying to a live server, set these in your platform's environment variab
 
 ## Example for Render.com:
 
+Copy these into Render Dashboard → Environment Variables:
+
 ```
 DB_HOST=your-mysql-host.com
 DB_USER=admin
@@ -45,8 +47,11 @@ DB_PASSWORD=secure_password_123
 DB_NAME=sales_management
 DB_PORT=3306
 NODE_ENV=production
+PORT=10000
 ALLOWED_ORIGINS=https://sales-management.vercel.app
 ```
+
+**All 7 variables are required for Render deployment.**
 
 ## Example for Local Development:
 

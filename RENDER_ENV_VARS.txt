@@ -1,0 +1,16 @@
+# Copy and paste these into Render.com Environment Variables
+
+# REQUIRED - Database Configuration
+DB_HOST=your-mysql-host.com
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_NAME=sales_management
+DB_PORT=3306
+
+# REQUIRED - Server Configuration
+NODE_ENV=production
+PORT=10000
+
+# REQUIRED - CORS (replace with your frontend URL)
+ALLOWED_ORIGINS=https://your-frontend.vercel.app
+

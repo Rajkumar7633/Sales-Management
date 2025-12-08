@@ -1,45 +1,27 @@
 # Quick Environment Variables Setup for Live Backend
 
-## For Render.com / Railway.app / Any Node.js Hosting
+## For Render.com - Copy & Paste These Variables
 
-Go to your platform's dashboard → Environment Variables section and add:
+Go to Render Dashboard → Your Service → Environment → Add these:
 
-### Required Database Variables:
 ```
 DB_HOST=your-mysql-host.com
 DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=sales_management
 DB_PORT=3306
-```
-
-### Required Server Variables:
-```
 NODE_ENV=production
 PORT=10000
-```
-
-**Note**: Render automatically sets PORT to 10000, but you can set it explicitly.
-
-### Required CORS Variable:
-```
 ALLOWED_ORIGINS=https://your-frontend.vercel.app
 ```
 
-Replace `https://your-frontend.vercel.app` with your actual frontend URL.
+**Replace:**
+- `your-mysql-host.com` → Your MySQL database host
+- `your_username` → Your MySQL username
+- `your_password` → Your MySQL password
+- `https://your-frontend.vercel.app` → Your actual Vercel frontend URL
 
-## Example Complete Setup:
-
-```
-DB_HOST=mysql.example.com
-DB_USER=admin
-DB_PASSWORD=MySecurePassword123
-DB_NAME=sales_management
-DB_PORT=3306
-NODE_ENV=production
-PORT=10000
-ALLOWED_ORIGINS=https://sales-management-system.vercel.app
-```
+**Note:** Render automatically sets PORT to 10000, but include it anyway for clarity.
 
 ## Steps:
 
