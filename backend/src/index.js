@@ -64,7 +64,21 @@ async function testDbConnection() {
     console.log('✅ Database connection test successful');
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
+    if (error.message.includes('Database configuration missing')) {
+      console.error('❌ Database configuration missing!');
+      console.error('📝 Please add these environment variables in Render:');
+      console.error('   1. DB_HOST (your MySQL host)');
+      console.error('   2. DB_USER (your MySQL username)');
+      console.error('   3. DB_PASSWORD (your MySQL password)');
+      console.error('   4. DB_NAME (sales_management)');
+      console.error('   5. DB_PORT (3306)');
+      console.error('   6. NODE_ENV (production)');
+      console.error('   7. PORT (10000)');
+      console.error('   8. ALLOWED_ORIGINS (your frontend URL)');
+      console.error('   Go to: Render Dashboard → Your Service → Environment');
+    } else {
+      console.error('❌ Database connection failed:', error.message);
+    }
     return false;
   }
 }
