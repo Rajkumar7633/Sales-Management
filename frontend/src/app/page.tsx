@@ -137,6 +137,7 @@ export default function Dashboard() {
       const params = new URLSearchParams({
         search: store.search,
         page: store.page.toString(),
+        pageSize: "10",
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
       })

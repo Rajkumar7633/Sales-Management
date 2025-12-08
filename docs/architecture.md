@@ -6,6 +6,7 @@ The Sales Management System is a modern full-stack application built with Next.j
 
 ## Backend Architecture
 
+
 ### API Routes (`app/api/`)
 
 **Sales Data Endpoint** (`/api/sales`)

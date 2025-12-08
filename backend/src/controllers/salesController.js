@@ -1,18 +1,8 @@
-import { SalesService } from "../services/salesService.js"
-
-// Singleton instance to share data across requests
-let salesServiceInstance = null
-
-function getSalesService() {
-  if (!salesServiceInstance) {
-    salesServiceInstance = new SalesService()
-  }
-  return salesServiceInstance
-}
+import salesService from "../services/salesService.js"
 
 export class SalesController {
   constructor() {
-    this.salesService = getSalesService()
+    this.salesService = salesService  // Use the imported instance
   }
 
   async getSales(req, res) {
@@ -20,6 +10,7 @@ export class SalesController {
       const {
         search = "",
         page = 1,
+        pageSize = 10,
         sortBy = "date",
         sortOrder,
         regions,
@@ -31,24 +22,38 @@ export class SalesController {
         dateRange,
       } = req.query
 
+      // Helper to parse array from query string
+      // Express automatically parses 'regions[]=value1&regions[]=value2' into an array
+      // But also handles 'regions=value1,value2' or single values
+      const parseArray = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.filter(v => v);
+        if (typeof value === 'string') {
+          // Handle comma-separated values
+          return value.split(',').map(v => v.trim()).filter(v => v);
+        }
+        return [];
+      };
+
       const result = await this.salesService.getFilteredSales({
-        search,
-        page: Number.parseInt(page),
-        sortBy,
-        sortOrder,
-        regions,
-        genders,
-        ageRange,
-        categories,
-        tags,
-        paymentMethods,
-        dateRange,
+        search: search.trim(),
+        page: Number.parseInt(page) || 1,
+        pageSize: Number.parseInt(pageSize) || 10,
+        sortBy: sortBy || "date",
+        sortOrder: sortOrder || "desc",
+        regions: parseArray(regions),
+        genders: parseArray(genders),
+        ageRange: ageRange || "",
+        categories: parseArray(categories),
+        tags: parseArray(tags),
+        paymentMethods: parseArray(paymentMethods),
+        dateRange: dateRange || "",
       })
 
       res.json(result)
     } catch (error) {
       console.error("API Error:", error)
-      res.status(500).json({ error: "Internal server error" })
+      res.status(500).json({ error: "Internal server error", message: error.message })
     }
   }
 
@@ -62,4 +67,3 @@ export class SalesController {
     }
   }
 }
-

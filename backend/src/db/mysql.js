@@ -1,40 +1,38 @@
-import mysql from "mysql2/promise"
+// /backend/src/db/mysql.js
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
-// Create a MySQL connection pool using environment variables
-// Required env vars:
-// - DB_HOST
-// - DB_PORT (optional, default 3306)
-// - DB_USER
-// - DB_PASSWORD
-// - DB_NAME
+dotenv.config();
 
-let pool
+const {
+  DB_HOST,
+  DB_USER,
+  DB_PASSWORD = '',
+  DB_NAME,
+  DB_PORT = '3306'
+} = process.env;
+
+let pool;
 
 export function getDbPool() {
   if (!pool) {
-    const {
-      DB_HOST,
-      DB_PORT,
-      DB_USER,
-      DB_PASSWORD,
-      DB_NAME,
-    } = process.env
-
     if (!DB_HOST || !DB_USER || !DB_NAME) {
-      throw new Error("Database configuration missing. Please set DB_HOST, DB_USER and DB_NAME env variables.")
+      throw new Error("Database configuration missing. Please set DB_HOST, DB_USER, and DB_NAME env variables.");
     }
 
     pool = mysql.createPool({
       host: DB_HOST,
-      port: DB_PORT ? Number.parseInt(DB_PORT, 10) : 3306,
+      port: Number(DB_PORT),
       user: DB_USER,
-      password: DB_PASSWORD || "",
+      password: DB_PASSWORD,
       database: DB_NAME,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-    })
+    });
   }
 
-  return pool
+  return pool;
 }
+
+export default getDbPool();
