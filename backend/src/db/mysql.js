@@ -11,13 +11,13 @@ export function getDbPool() {
     return pool;
   }
 
-  const {
-    DB_HOST,
-    DB_USER,
-    DB_PASSWORD = '',
-    DB_NAME,
-    DB_PORT = '3306'
-  } = process.env;
+const {
+  DB_HOST,
+  DB_USER,
+  DB_PASSWORD = '',
+  DB_NAME,
+  DB_PORT = '3306'
+} = process.env;
 
   if (!DB_HOST || !DB_USER || !DB_NAME) {
     const missing = [];
@@ -29,18 +29,18 @@ export function getDbPool() {
       `Database configuration missing. Please set these environment variables in Render: ${missing.join(', ')}. ` +
       `Go to Render Dashboard → Your Service → Environment → Add Environment Variable`
     );
-  }
+    }
 
-  pool = mysql.createPool({
-    host: DB_HOST,
-    port: Number(DB_PORT),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
+    pool = mysql.createPool({
+      host: DB_HOST,
+      port: Number(DB_PORT),
+      user: DB_USER,
+      password: DB_PASSWORD,
+      database: DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
 
   return pool;
 }

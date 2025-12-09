@@ -160,8 +160,8 @@ async function main() {
         .on('end', async () => {
           if (batch.length > 0) {
             try {
-              await insertBatch(pool, batch);
-              count += batch.length;
+            await insertBatch(pool, batch);
+            count += batch.length;
             } catch (err) {
               console.error('Error inserting final batch:', err.message);
               reject(err);

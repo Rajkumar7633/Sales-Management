@@ -113,7 +113,7 @@ class Sales {
   }) {
     const offset = (page - 1) * limit;
     const params = [];
-    
+
     // Build WHERE clause
     const whereClause = this.buildWhereClause({
       search,

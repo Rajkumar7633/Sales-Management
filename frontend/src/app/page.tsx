@@ -23,7 +23,7 @@ export default function Dashboard() {
   // Fetch data whenever store changes (but wait for backend to be ready)
   useEffect(() => {
     if (!backendLoading && !connectionError) {
-      fetchData()
+    fetchData()
     }
   }, [store.search, store.page, store.sortBy, store.sortOrder, store.filters, backendLoading, connectionError])
 

@@ -28,7 +28,7 @@ export async function generateSalesData() {
   loadingPromise = (async () => {
     try {
       const csvPath = join(__dirname, "..", "..", "..", "truestate_assignment_dataset.csv")
-      
+    
       if (!existsSync(csvPath)) {
         console.error(`CSV file not found at: ${csvPath}`)
         throw new Error(`CSV file not found at ${csvPath}`)
@@ -98,10 +98,10 @@ export async function generateSalesData() {
       await pipeline(
         createReadStream(csvPath),
         parse({
-          columns: true,
-          skip_empty_lines: true,
-          trim: true,
-          relax_column_count: true,
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
           bom: true,
           cast: false, // Don't auto-cast to reduce memory
         }),
@@ -112,17 +112,17 @@ export async function generateSalesData() {
       const totalTime = ((Date.now() - loadStartTime) / 1000).toFixed(2)
       console.log(`✅ Loaded ${cachedData.length.toLocaleString()} records from CSV in ${totalTime}s`)
       return cachedData
-    } catch (error) {
-      console.error("Error reading CSV file:", error)
+  } catch (error) {
+    console.error("Error reading CSV file:", error)
       if (error.message && error.message.includes("heap")) {
         console.error("❌ Out of memory! The CSV file is too large for the current memory limit.")
       }
       cachedData = []
-      return []
+    return []
     } finally {
       isLoading = false
       loadingPromise = null
-    }
+  }
   })()
 
   return loadingPromise
