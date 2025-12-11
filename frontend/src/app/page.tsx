@@ -87,14 +87,14 @@ export default function Dashboard() {
         if (healthRes.ok) {
           const health = await healthRes.json()
           console.log("Backend health:", health)
-          if (!health.dataLoaded) {
-            console.log("Backend data is still loading, will retry in 2 seconds...")
-            setConnectionError("Backend is loading data, please wait...")
-            // Retry after 2 seconds if data not loaded
-            setTimeout(() => checkBackendAndFetch(), 2000)
-            return
+          // Health endpoint returns { ok: true, db: true } - if db is true, backend is ready
+          if (health.ok && health.db) {
+            console.log("✅ Backend is ready and connected to database")
+            setConnectionError(null) // Clear any previous errors
+          } else {
+            console.log("⚠️ Backend health check passed but database not connected")
+            setConnectionError("Backend database not connected. Please check backend logs.")
           }
-          setConnectionError(null) // Clear any previous errors
         } else {
           console.error("Backend health check failed:", healthRes.status, healthRes.statusText)
           setConnectionError(`Backend returned error: ${healthRes.status}`)
