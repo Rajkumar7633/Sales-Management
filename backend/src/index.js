@@ -1,6 +1,8 @@
 // /backend/src/index.js
 import express from "express";
 import cors from "cors";
+import https from "https";
+import http from "http";
 import salesRoutes from "./routes/sales.js";
 import { getDbPool } from "./db/mysql.js";
 
@@ -115,6 +117,100 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// Self-ping mechanism to keep Render free tier alive
+let keepAliveInterval = null;
+
+function startKeepAlivePing() {
+  // Only run in production (on Render)
+  if (process.env.NODE_ENV !== "production") {
+    console.log("⏭️  Skipping keep-alive ping (not in production)");
+    return;
+  }
+
+  // Get the Render service URL from environment
+  // RENDER_EXTERNAL_URL is automatically provided by Render
+  const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL;
+  
+  if (!renderUrl) {
+    console.log("⚠️  RENDER_EXTERNAL_URL not set, keep-alive ping disabled");
+    console.log("💡 Render should automatically provide RENDER_EXTERNAL_URL");
+    return;
+  }
+
+  const healthCheckUrl = `${renderUrl}/api/health`;
+  const pingInterval = 30 * 1000; // 30 seconds
+
+  console.log(`🔄 Starting keep-alive ping every 30 seconds to: ${healthCheckUrl}`);
+
+  // Ping immediately on start
+  pingHealthEndpoint(healthCheckUrl);
+
+  // Then ping every 30 seconds
+  keepAliveInterval = setInterval(() => {
+    pingHealthEndpoint(healthCheckUrl);
+  }, pingInterval);
+}
+
+async function pingHealthEndpoint(url) {
+  return new Promise((resolve) => {
+    try {
+      const urlObj = new URL(url);
+      const isHttps = urlObj.protocol === "https:";
+      const client = isHttps ? https : http;
+
+      const options = {
+        hostname: urlObj.hostname,
+        port: urlObj.port || (isHttps ? 443 : 80),
+        path: urlObj.pathname,
+        method: "GET",
+        headers: {
+          "User-Agent": "Render-KeepAlive/1.0",
+        },
+        timeout: 10000, // 10 second timeout
+      };
+
+      const req = client.request(options, (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () => {
+          if (res.statusCode === 200) {
+            console.log(`✅ Keep-alive ping successful: ${new Date().toISOString()}`);
+          } else {
+            console.log(`⚠️  Keep-alive ping returned status: ${res.statusCode}`);
+          }
+          resolve();
+        });
+      });
+
+      req.on("error", (error) => {
+        console.log(`⚠️  Keep-alive ping failed: ${error.message}`);
+        resolve();
+      });
+
+      req.on("timeout", () => {
+        req.destroy();
+        console.log(`⏱️  Keep-alive ping timeout (server may be starting)`);
+        resolve();
+      });
+
+      req.end();
+    } catch (error) {
+      console.log(`⚠️  Keep-alive ping error: ${error.message}`);
+      resolve();
+    }
+  });
+}
+
+function stopKeepAlivePing() {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+    console.log("🛑 Stopped keep-alive ping");
+  }
+}
+
 // Start server
 async function startServer() {
   // Initialize DB pool and start keepalive
@@ -124,11 +220,18 @@ async function startServer() {
   // Start the Express server
   const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
+    
+    // Start keep-alive ping after server is ready
+    // Wait a bit for server to fully initialize
+    setTimeout(() => {
+      startKeepAlivePing();
+    }, 5000); // Wait 5 seconds after server starts
   });
 
   // Graceful shutdown
   const shutdown = async () => {
     console.log("Shutting down...");
+    stopKeepAlivePing();
     try {
       db.stopKeepAlive();
     } catch (e) {}
