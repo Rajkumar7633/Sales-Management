@@ -101,57 +101,19 @@ async function testDbConnection() {
 // Routes
 app.use("/api/sales", salesRoutes);
 
-// Health check endpoint - tests MySQL connection
+// Health check endpoint
 app.get("/api/health", async (req, res) => {
   try {
-    // Test MySQL connection
+    // try a lightweight DB check if pool exists
     const pool = db.getPool();
-    if (!pool) {
-      return res.status(500).json({ ok: false, db: false, error: "Database pool not initialized" });
+    if (pool) {
+      const [rows] = await pool.query("SELECT 1");
+      // ignore rows, just ensure query runs
     }
-    
-    // Test query to MySQL
-    const [rows] = await pool.query("SELECT 1 as test, DATABASE() as db_name, NOW() as server_time");
-    
-    // Check if sales table exists and get row count
-    let tableInfo = null;
-    try {
-      const [tableCheck] = await pool.query(
-        "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sales'"
-      );
-      const tableExists = tableCheck[0].count > 0;
-      
-      if (tableExists) {
-        const [[{ count }]] = await pool.query("SELECT COUNT(*) as count FROM sales");
-        tableInfo = {
-          exists: true,
-          rowCount: count
-        };
-      } else {
-        tableInfo = {
-          exists: false,
-          rowCount: 0
-        };
-      }
-    } catch (tableErr) {
-      tableInfo = { error: tableErr.message };
-    }
-    
-    return res.json({ 
-      ok: true, 
-      db: true,
-      database: rows[0].db_name,
-      serverTime: rows[0].server_time,
-      table: tableInfo
-    });
+    return res.json({ ok: true, db: !!pool });
   } catch (err) {
     console.error("Health check DB error:", err.message || err);
-    return res.status(500).json({ 
-      ok: false, 
-      db: false, 
-      error: "MySQL connection failed",
-      message: err.message 
-    });
+    return res.status(500).json({ ok: false, error: "DB check failed" });
   }
 });
 
@@ -252,39 +214,51 @@ function stopKeepAlivePing() {
 // Start server
 async function startServer() {
   // Initialize DB pool and start keepalive
-  console.log('🔄 Initializing MySQL database connection...');
+  console.log('🔄 Initializing AWS RDS MySQL connection...');
   console.log(`📊 Database config: ${process.env.DB_HOST ? 'Host: ' + process.env.DB_HOST : 'DB_HOST not set'}, ${process.env.DB_NAME ? 'Database: ' + process.env.DB_NAME : 'DB_NAME not set'}`);
   
   await db.initPool();
   db.startKeepAlive(60_000); // ping every 60s
 
-  // Test database connection and show table info
+  // Test AWS RDS MySQL connection
   try {
     const pool = db.getPool();
     if (pool) {
-      // Check if sales table exists and get row count
-      const [tableCheck] = await pool.query(
-        "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sales'"
-      );
-      const tableExists = tableCheck[0].count > 0;
+      // Test connection
+      const [rows] = await pool.query("SELECT DATABASE() as db_name, NOW() as server_time");
+      console.log(`✅ AWS RDS MySQL connected! Database: ${rows[0].db_name}`);
       
-      if (tableExists) {
-        const [[{ count }]] = await pool.query("SELECT COUNT(*) as count FROM sales");
-        console.log(`✅ MySQL connected! Sales table exists with ${count} records.`);
-      } else {
-        console.log(`⚠️  MySQL connected, but 'sales' table does not exist. Please import your data.`);
+      // Check if sales table exists and get row count
+      try {
+        const [tableCheck] = await pool.query(
+          "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sales'"
+        );
+        const tableExists = tableCheck[0].count > 0;
+        
+        if (tableExists) {
+          const [[{ count }]] = await pool.query("SELECT COUNT(*) as count FROM sales");
+          console.log(`✅ Sales table exists with ${count} records in AWS RDS MySQL.`);
+        } else {
+          console.log(`⚠️  Sales table does not exist. Please import your data to AWS RDS.`);
+        }
+      } catch (tableErr) {
+        console.error('⚠️  Could not check sales table:', tableErr.message);
       }
     }
   } catch (dbErr) {
-    console.error('❌ Database connection test failed:', dbErr.message);
+    console.error('❌ AWS RDS MySQL connection test failed:', dbErr.message);
+    console.error('💡 Please verify:');
+    console.error('   1. DB_HOST, DB_USER, DB_PASSWORD, DB_NAME are set in Render');
+    console.error('   2. AWS RDS Security Group allows connections from Render (0.0.0.0/0 or Render IPs)');
+    console.error('   3. RDS instance is publicly accessible');
   }
 
   // Start the Express server
   const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📡 API endpoints:`);
+    console.log(`📡 API endpoints available:`);
     console.log(`   - GET /api/health - Health check`);
-    console.log(`   - GET /api/sales - Get sales data`);
+    console.log(`   - GET /api/sales - Get sales data from AWS RDS MySQL`);
     console.log(`   - GET /api/sales/filter-options - Get filter options`);
     console.log(`   - GET /api/sales/test - Test database connection`);
     
