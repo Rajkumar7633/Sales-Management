@@ -82,14 +82,14 @@ export class SalesController {
         data: salesData,
         pagination: {
           page: currentPage,
-          limit: limit,
-          total: total,
+          pageSize: limit,
+          totalItems: total,
           totalPages: Math.ceil(total / limit)
         },
-        aggregations: {
-          totalSales: metadata.totalAmount || 0,
-          totalItems: metadata.totalUnits || 0,
-          avgOrderValue: salesData.length > 0 ? (metadata.totalAmount || 0) / salesData.length : 0
+        metadata: {
+          totalUnits: metadata.totalUnits || 0,
+          totalAmount: metadata.totalAmount || 0,
+          totalDiscount: metadata.totalDiscount || 0
         }
       })
     } catch (error) {
