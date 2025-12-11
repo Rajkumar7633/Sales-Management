@@ -93,8 +93,13 @@ export class SalesController {
         }
       })
     } catch (error) {
-      console.error("API Error:", error)
-      res.status(500).json({ error: "Internal server error", message: error.message })
+      console.error("❌ API Error in getSales:", error.message)
+      console.error("Stack:", error.stack)
+      res.status(500).json({ 
+        error: "Internal server error", 
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
     }
   }
 
@@ -103,8 +108,13 @@ export class SalesController {
       const options = await this.salesModel.getFilterOptions()
       res.json(options)
     } catch (error) {
-      console.error("Filter Options Error:", error)
-      res.status(500).json({ error: "Internal server error" })
+      console.error("❌ Filter Options Error:", error.message)
+      console.error("Stack:", error.stack)
+      res.status(500).json({ 
+        error: "Internal server error",
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
     }
   }
 }

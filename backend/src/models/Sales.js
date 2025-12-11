@@ -3,7 +3,20 @@ import { getDbPool } from '../db/mysql.js';
 
 class Sales {
   constructor() {
-    this.pool = getDbPool();
+    // Don't initialize pool in constructor - get it lazily when needed
+    this._pool = null;
+  }
+
+  get pool() {
+    if (!this._pool) {
+      try {
+        this._pool = getDbPool();
+      } catch (error) {
+        console.error('❌ Failed to get database pool:', error.message);
+        throw error;
+      }
+    }
+    return this._pool;
   }
 
   async getAll() {
@@ -111,147 +124,205 @@ class Sales {
     paymentMethods = [],
     dateRange = ''
   }) {
-    const offset = (page - 1) * limit;
-    const params = [];
+    try {
+      const offset = (page - 1) * limit;
+      const params = [];
 
-    // Build WHERE clause
-    const whereClause = this.buildWhereClause({
-      search,
-      regions,
-      genders,
-      ageRange,
-      categories,
-      tags,
-      paymentMethods,
-      dateRange
-    }, params);
+      // Build WHERE clause
+      const whereClause = this.buildWhereClause({
+        search,
+        regions,
+        genders,
+        ageRange,
+        categories,
+        tags,
+        paymentMethods,
+        dateRange
+      }, params);
 
-    // Map frontend sortBy to database column names
-    const sortColumnMap = {
-      'date': 'date',
-      'customerName': 'customerName',
-      'quantity': 'quantity',
-      'total': 'totalAmount',
-      'final': 'finalAmount'
-    };
-    const dbSortColumn = sortColumnMap[sortBy] || 'date';
-    const sortDirection = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      // Map frontend sortBy to database column names
+      const sortColumnMap = {
+        'date': 'date',
+        'customerName': 'customerName',
+        'quantity': 'quantity',
+        'total': 'totalAmount',
+        'final': 'finalAmount'
+      };
+      const dbSortColumn = sortColumnMap[sortBy] || 'date';
+      const sortDirection = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      
+      // Build query
+      let query = `SELECT * FROM sales ${whereClause} ORDER BY ${dbSortColumn} ${sortDirection} LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+
+      console.log(`📊 Executing query: ${query.substring(0, 100)}...`);
+      const [rows] = await this.pool.query(query, params);
+      console.log(`✅ Retrieved ${rows.length} records from database`);
     
-    // Build query
-    let query = `SELECT * FROM sales ${whereClause} ORDER BY ${dbSortColumn} ${sortDirection} LIMIT ? OFFSET ?`;
-    params.push(limit, offset);
-
-    const [rows] = await this.pool.query(query, params);
-    
-    // Transform to match frontend expected format
-    return rows.map(row => ({
-      "Transaction ID": row.transactionId,
-      "Date": row.date ? new Date(row.date).toISOString().split('T')[0] : null,
-      "Customer ID": row.customerId,
-      "Customer name": row.customerName,
-      "Phone Number": row.phoneNumber,
-      "Gender": row.gender,
-      "Age": row.age,
-      "Customer region": row.customerRegion,
-      "Product ID": row.productId,
-      "Product Category": row.productCategory,
-      "Product Name": row.productName,
-      "Brand": row.brand,
-      "Quantity": row.quantity,
-      "Price per Unit": row.pricePerUnit,
-      "Total Amount": row.totalAmount,
-      "Final Amount": row.finalAmount,
-      "Discount Percentage": row.discountPercentage,
-      "Payment Method": row.paymentMethod,
-      "Tags": row.tags,
-      "Employee name": row.employeeName,
-      "Customer Type": row.customerType,
-      "Order Status": row.orderStatus,
-      "Delivery Type": row.deliveryType,
-      "Store ID": row.storeId,
-      "Store Location": row.storeLocation,
-      "Salesperson ID": row.salespersonId,
-    }));
+      // Transform to match frontend expected format
+      return rows.map(row => ({
+        "Transaction ID": row.transactionId,
+        "Date": row.date ? new Date(row.date).toISOString().split('T')[0] : null,
+        "Customer ID": row.customerId,
+        "Customer name": row.customerName,
+        "Phone Number": row.phoneNumber,
+        "Gender": row.gender,
+        "Age": row.age,
+        "Customer region": row.customerRegion,
+        "Product ID": row.productId,
+        "Product Category": row.productCategory,
+        "Product Name": row.productName,
+        "Brand": row.brand,
+        "Quantity": row.quantity,
+        "Price per Unit": row.pricePerUnit,
+        "Total Amount": row.totalAmount,
+        "Final Amount": row.finalAmount,
+        "Discount Percentage": row.discountPercentage,
+        "Payment Method": row.paymentMethod,
+        "Tags": row.tags,
+        "Employee name": row.employeeName,
+        "Customer Type": row.customerType,
+        "Order Status": row.orderStatus,
+        "Delivery Type": row.deliveryType,
+        "Store ID": row.storeId,
+        "Store Location": row.storeLocation,
+        "Salesperson ID": row.salespersonId,
+      }));
+    } catch (error) {
+      console.error('❌ Error in getFilteredSales:', error.message);
+      console.error('Stack:', error.stack);
+      throw error;
+    }
   }
 
   async getCount(filters = {}) {
-    const params = [];
-    const whereClause = this.buildWhereClause(filters, params);
-    
-    const query = `SELECT COUNT(*) as total FROM sales ${whereClause}`;
-    const [[{ total }]] = await this.pool.query(query, params);
-    return total;
+    try {
+      const params = [];
+      const whereClause = this.buildWhereClause(filters, params);
+      
+      const query = `SELECT COUNT(*) as total FROM sales ${whereClause}`;
+      const [[{ total }]] = await this.pool.query(query, params);
+      return total;
+    } catch (error) {
+      console.error('❌ Error in getCount:', error.message);
+      throw error;
+    }
   }
 
   async getMetadata(filters = {}) {
-    const params = [];
-    const whereClause = this.buildWhereClause(filters, params);
-    
-    const query = `
-      SELECT 
-        SUM(quantity) as totalUnits,
-        SUM(totalAmount) as totalAmount,
-        SUM(totalAmount - finalAmount) as totalDiscount
-      FROM sales ${whereClause}
-    `;
-    
-    const [[result]] = await this.pool.query(query, params);
-    return {
-      totalUnits: result.totalUnits || 0,
-      totalAmount: result.totalAmount || 0,
-      totalDiscount: result.totalDiscount || 0,
-    };
+    try {
+      const params = [];
+      const whereClause = this.buildWhereClause(filters, params);
+      
+      const query = `
+        SELECT 
+          SUM(quantity) as totalUnits,
+          SUM(totalAmount) as totalAmount,
+          SUM(totalAmount - finalAmount) as totalDiscount
+        FROM sales ${whereClause}
+      `;
+      
+      const [[result]] = await this.pool.query(query, params);
+      return {
+        totalUnits: result.totalUnits || 0,
+        totalAmount: result.totalAmount || 0,
+        totalDiscount: result.totalDiscount || 0,
+      };
+    } catch (error) {
+      console.error('❌ Error in getMetadata:', error.message);
+      throw error;
+    }
   }
 
   async getFilterOptions() {
-    // Get distinct regions
-    const [regions] = await this.pool.query(
-      'SELECT DISTINCT customerRegion as name FROM sales WHERE customerRegion IS NOT NULL AND customerRegion != "" ORDER BY customerRegion'
-    );
-    
-    // Get distinct genders
-    const [genders] = await this.pool.query(
-      'SELECT DISTINCT gender as name FROM sales WHERE gender IS NOT NULL AND gender != "" ORDER BY gender'
-    );
-    
-    // Get distinct categories
-    const [categories] = await this.pool.query(
-      'SELECT DISTINCT productCategory as name FROM sales WHERE productCategory IS NOT NULL AND productCategory != "" ORDER BY productCategory'
-    );
-    
-    // Get distinct payment methods
-    const [paymentMethods] = await this.pool.query(
-      'SELECT DISTINCT paymentMethod as name FROM sales WHERE paymentMethod IS NOT NULL AND paymentMethod != "" ORDER BY paymentMethod'
-    );
-    
-    // Get all tags (they're comma-separated, so we need to extract them)
-    const [tagRows] = await this.pool.query(
-      'SELECT DISTINCT tags FROM sales WHERE tags IS NOT NULL AND tags != ""'
-    );
-    
-    // Extract unique tags from comma-separated values
-    const tagSet = new Set();
-    tagRows.forEach(row => {
-      if (row.tags) {
-        row.tags.split(',').forEach(tag => {
-          const trimmed = tag.trim();
-          if (trimmed) tagSet.add(trimmed);
-        });
+    try {
+      // Get distinct regions
+      const [regions] = await this.pool.query(
+        'SELECT DISTINCT customerRegion as name FROM sales WHERE customerRegion IS NOT NULL AND customerRegion != "" ORDER BY customerRegion'
+      );
+      
+      // Get distinct genders
+      const [genders] = await this.pool.query(
+        'SELECT DISTINCT gender as name FROM sales WHERE gender IS NOT NULL AND gender != "" ORDER BY gender'
+      );
+      
+      // Get distinct categories
+      const [categories] = await this.pool.query(
+        'SELECT DISTINCT productCategory as name FROM sales WHERE productCategory IS NOT NULL AND productCategory != "" ORDER BY productCategory'
+      );
+      
+      // Get distinct payment methods
+      const [paymentMethods] = await this.pool.query(
+        'SELECT DISTINCT paymentMethod as name FROM sales WHERE paymentMethod IS NOT NULL AND paymentMethod != "" ORDER BY paymentMethod'
+      );
+      
+      // Get all tags (they're comma-separated, so we need to extract them)
+      const [tagRows] = await this.pool.query(
+        'SELECT DISTINCT tags FROM sales WHERE tags IS NOT NULL AND tags != ""'
+      );
+      
+      // Extract unique tags from comma-separated values
+      const tagSet = new Set();
+      tagRows.forEach(row => {
+        if (row.tags) {
+          row.tags.split(',').forEach(tag => {
+            const trimmed = tag.trim();
+            if (trimmed) tagSet.add(trimmed);
+          });
+        }
+      });
+      const tags = Array.from(tagSet).sort();
+      
+      // Age ranges are fixed
+      const ageRanges = ['18-25', '26-35', '36-45', '46-55', '56+'];
+      
+      return {
+        regions: regions.map(r => r.name),
+        genders: genders.map(g => g.name),
+        ageRanges,
+        categories: categories.map(c => c.name),
+        tags,
+        paymentMethods: paymentMethods.map(p => p.name)
+      };
+    } catch (error) {
+      console.error('❌ Error in getFilterOptions:', error.message);
+      throw error;
+    }
+  }
+
+  // Test method to check database connection and table
+  async testConnection() {
+    try {
+      // Test basic connection
+      await this.pool.query('SELECT 1 as test');
+      
+      // Check if sales table exists
+      const [tables] = await this.pool.query(
+        "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sales'"
+      );
+      
+      const tableExists = tables[0].count > 0;
+      
+      if (!tableExists) {
+        return { connected: true, tableExists: false, error: 'sales table does not exist' };
       }
-    });
-    const tags = Array.from(tagSet).sort();
-    
-    // Age ranges are fixed
-    const ageRanges = ['18-25', '26-35', '36-45', '46-55', '56+'];
-    
-    return {
-      regions: regions.map(r => r.name),
-      genders: genders.map(g => g.name),
-      ageRanges,
-      categories: categories.map(c => c.name),
-      tags,
-      paymentMethods: paymentMethods.map(p => p.name)
-    };
+      
+      // Check row count
+      const [[{ count }]] = await this.pool.query('SELECT COUNT(*) as count FROM sales');
+      
+      return {
+        connected: true,
+        tableExists: true,
+        rowCount: count,
+        message: `Database connected. Found ${count} records in sales table.`
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        error: error.message,
+        stack: error.stack
+      };
+    }
   }
 }
 
