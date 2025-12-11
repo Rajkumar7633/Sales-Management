@@ -1,72 +1,69 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSalesData } from "@/lib/data"
-import { filterAndSortData } from "@/lib/filters"
 
+// Proxy to backend API - fetch data from AWS MySQL via Render backend
 export async function GET(request: NextRequest) {
   try {
+    // Get backend URL from environment or use default
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://sales-management-backend-noas.onrender.com"
+    const backendApiUrl = `${backendUrl}/api/sales`
+
+    // Forward all query parameters to backend
     const searchParams = request.nextUrl.searchParams
+    const backendUrlWithParams = `${backendApiUrl}?${searchParams.toString()}`
 
-    // Get query parameters
-    const search = searchParams.get("search") || ""
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const sortBy = searchParams.get("sortBy") || "customerName"
-    const sortOrder = searchParams.get("sortOrder")
+    console.log("🔄 Proxying request to backend:", backendUrlWithParams)
 
-    // Parse filter parameters
-    const regions = searchParams.getAll("regions[]")
-    const genders = searchParams.getAll("genders[]")
-    const ageRange = searchParams.get("ageRange") || searchParams.get("ageRange[]") || ""
-    const categories = searchParams.getAll("categories[]")
-    const tags = searchParams.getAll("tags[]")
-    const paymentMethods = searchParams.getAll("paymentMethods[]")
-    const dateRange = searchParams.get("dateRange") || searchParams.get("dateRange[]") || ""
+    // Fetch from backend (AWS MySQL)
+    const response = await fetch(backendUrlWithParams, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Add timeout
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+    })
 
-    // Get raw sales data
-    const allData = await getSalesData()
-
-    // Determine default sort order based on sortBy
-    let defaultSortOrder = sortOrder as "asc" | "desc"
-    if (!sortOrder || sortOrder === "undefined") {
-      defaultSortOrder = sortBy === "customerName" ? "asc" : "desc"
+    if (!response.ok) {
+      console.error("❌ Backend returned error:", response.status, response.statusText)
+      const errorText = await response.text()
+      console.error("Error details:", errorText)
+      return NextResponse.json(
+        { error: `Backend error: ${response.status} ${response.statusText}`, details: errorText },
+        { status: response.status }
+      )
     }
 
-    // Apply filters and sorting
-    const filtered = filterAndSortData(allData, {
-      search,
-      regions: regions.length > 0 ? regions : undefined,
-      genders: genders.length > 0 ? genders : undefined,
-      ageRange: ageRange || undefined,
-      categories: categories.length > 0 ? categories : undefined,
-      tags: tags.length > 0 ? tags : undefined,
-      paymentMethods: paymentMethods.length > 0 ? paymentMethods : undefined,
-      dateRange: dateRange || undefined,
-      sortBy,
-      sortOrder: defaultSortOrder,
-    })
+    const data = await response.json()
+    console.log("✅ Backend response received, data count:", data.data?.length || 0)
 
-    // Apply pagination
-    const pageSize = 10
-    const totalItems = filtered.length
-    const totalPages = Math.ceil(totalItems / pageSize)
-    const startIndex = (page - 1) * pageSize
-    const paginatedData = filtered.slice(startIndex, startIndex + pageSize)
-
+    // Transform backend response to match frontend expectations
     return NextResponse.json({
-      data: paginatedData,
+      data: data.data || [],
       pagination: {
-        page,
-        pageSize,
-        totalItems,
-        totalPages,
+        page: data.pagination?.page || 1,
+        pageSize: data.pagination?.limit || data.pagination?.pageSize || 10,
+        totalItems: data.pagination?.total || data.pagination?.totalItems || 0,
+        totalPages: data.pagination?.totalPages || 0,
       },
       metadata: {
-        totalUnits: filtered.reduce((sum, item) => sum + item.Quantity, 0),
-        totalAmount: filtered.reduce((sum, item) => sum + item["Total Amount"], 0),
-        totalDiscount: filtered.reduce((sum, item) => sum + (item["Total Amount"] - item["Final Amount"]), 0),
+        totalUnits: data.aggregations?.totalItems || data.metadata?.totalUnits || 0,
+        totalAmount: data.aggregations?.totalSales || data.metadata?.totalAmount || 0,
+        totalDiscount: data.metadata?.totalDiscount || 0,
       },
     })
-  } catch (error) {
-    console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  } catch (error: any) {
+    console.error("❌ Error proxying to backend:", error)
+
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: "Backend request timeout. Backend may be slow to respond." },
+        { status: 504 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: "Failed to connect to backend", details: error.message },
+      { status: 500 }
+    )
   }
 }

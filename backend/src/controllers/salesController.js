@@ -82,9 +82,16 @@ export class SalesController {
         data: salesData,
         pagination: {
           page: currentPage,
-          limit: limit,
-          total: total,
+          pageSize: limit,
+          limit: limit, // Keep for backward compatibility
+          totalItems: total,
+          total: total, // Keep for backward compatibility
           totalPages: Math.ceil(total / limit)
+        },
+        metadata: {
+          totalUnits: metadata.totalUnits || 0,
+          totalAmount: metadata.totalAmount || 0,
+          totalDiscount: metadata.totalDiscount || 0
         },
         aggregations: {
           totalSales: metadata.totalAmount || 0,
