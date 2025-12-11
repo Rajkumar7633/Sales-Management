@@ -5,18 +5,22 @@ import Sales from '../models/Sales.js';
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variable
-if (!process.env.MONGODB_URI) {
-  console.error('MONGODB_URI is not defined in environment variables');
-  process.exit(1);
+// MongoDB is optional - only use if MONGODB_URI is provided
+const hasMongoDB = !!process.env.MONGODB_URI;
+
+if (!hasMongoDB) {
+  console.log('ℹ️  MONGODB_URI not set - MongoDB features will be disabled. Using MySQL instead.');
 }
 
 class SalesService {
   constructor() {
-    if (mongoose.connection.readyState !== 1) {
+    // Only connect to MongoDB if MONGODB_URI is provided
+    if (hasMongoDB && mongoose.connection.readyState !== 1) {
       mongoose.connect(process.env.MONGODB_URI, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
+      }).catch(err => {
+        console.error('MongoDB connection error:', err.message);
       });
     }
   }
@@ -35,6 +39,11 @@ class SalesService {
     maxAmount,
     limit = 10
   }) {
+    // If MongoDB is not configured, throw error to indicate MySQL should be used
+    if (!hasMongoDB) {
+      throw new Error('MongoDB not configured. Please use MySQL-based endpoints.');
+    }
+    
     try {
       const query = {};
 
@@ -123,6 +132,11 @@ class SalesService {
   }
 
   async getFilterOptions() {
+    // If MongoDB is not configured, throw error to indicate MySQL should be used
+    if (!hasMongoDB) {
+      throw new Error('MongoDB not configured. Please use MySQL-based endpoints.');
+    }
+    
     try {
       const [regions, categories, paymentMethods] = await Promise.all([
         Sales.distinct('region'),
@@ -142,6 +156,11 @@ class SalesService {
   }
 
   async getSalesData() {
+    // If MongoDB is not configured, throw error to indicate MySQL should be used
+    if (!hasMongoDB) {
+      throw new Error('MongoDB not configured. Please use MySQL-based endpoints.');
+    }
+    
     try {
       return await Sales.find().limit(100).lean();
     } catch (error) {

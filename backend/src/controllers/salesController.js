@@ -1,8 +1,8 @@
-import salesService from "../services/salesService.js"
+import Sales from "../models/Sales.js"
 
 export class SalesController {
   constructor() {
-    this.salesService = salesService  // Use the imported instance
+    this.salesModel = Sales  // Use the MySQL-based Sales model
   }
 
   async getSales(req, res) {
@@ -35,10 +35,11 @@ export class SalesController {
         return [];
       };
 
-      const result = await this.salesService.getFilteredSales({
+      // Get filtered sales data from MySQL
+      const salesData = await this.salesModel.getFilteredSales({
         search: search.trim(),
         page: Number.parseInt(page) || 1,
-        pageSize: Number.parseInt(pageSize) || 10,
+        limit: Number.parseInt(pageSize) || 10,
         sortBy: sortBy || "date",
         sortOrder: sortOrder || "desc",
         regions: parseArray(regions),
@@ -48,9 +49,49 @@ export class SalesController {
         tags: parseArray(tags),
         paymentMethods: parseArray(paymentMethods),
         dateRange: dateRange || "",
-      })
+      });
 
-      res.json(result)
+      // Get total count for pagination
+      const total = await this.salesModel.getCount({
+        search: search.trim(),
+        regions: parseArray(regions),
+        genders: parseArray(genders),
+        ageRange: ageRange || "",
+        categories: parseArray(categories),
+        tags: parseArray(tags),
+        paymentMethods: parseArray(paymentMethods),
+        dateRange: dateRange || "",
+      });
+
+      // Get metadata (aggregations)
+      const metadata = await this.salesModel.getMetadata({
+        search: search.trim(),
+        regions: parseArray(regions),
+        genders: parseArray(genders),
+        ageRange: ageRange || "",
+        categories: parseArray(categories),
+        tags: parseArray(tags),
+        paymentMethods: parseArray(paymentMethods),
+        dateRange: dateRange || "",
+      });
+
+      const currentPage = Number.parseInt(page) || 1;
+      const limit = Number.parseInt(pageSize) || 10;
+
+      res.json({
+        data: salesData,
+        pagination: {
+          page: currentPage,
+          limit: limit,
+          total: total,
+          totalPages: Math.ceil(total / limit)
+        },
+        aggregations: {
+          totalSales: metadata.totalAmount || 0,
+          totalItems: metadata.totalUnits || 0,
+          avgOrderValue: salesData.length > 0 ? (metadata.totalAmount || 0) / salesData.length : 0
+        }
+      })
     } catch (error) {
       console.error("API Error:", error)
       res.status(500).json({ error: "Internal server error", message: error.message })
@@ -59,7 +100,7 @@ export class SalesController {
 
   async getFilterOptions(req, res) {
     try {
-      const options = await this.salesService.getFilterOptions()
+      const options = await this.salesModel.getFilterOptions()
       res.json(options)
     } catch (error) {
       console.error("Filter Options Error:", error)
